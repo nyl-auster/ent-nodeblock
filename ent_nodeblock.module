@@ -36,7 +36,7 @@ function ent_nodeblock_block_info() {
   foreach (ent_nodeblock_get_all() as $nid) {
     $node = node_load($nid);
     $delta = ent_nodeblock_create_delta($nid);
-    $blocks[$delta] = array('info' => t($node->title));
+    $blocks[$delta] = array('info' => t("Ent nodeblock : $node->title"));
     drupal_alter('ent_nodeblock_info', $blocks[$delta], $node);
   }
   return $blocks;
@@ -93,18 +93,35 @@ function ent_nodeblock_create_delta($nid) {
  * @return array of nids
  */
 function ent_nodeblock_get_all() {
-  return ent_nodeblock_get_nodes(variable_get('ent_nodeblock_content_types', array()));
+  $content_types = ent_nodeblock_get_conf_content_types(TRUE);
+  return ent_nodeblock_get_nodes(array_keys($content_types));
+}
+
+/**
+ * Get content types configuration, set in admin/structure/ent-nodeblock
+ * @param bool $enabled_only return only enabled content_types conf
+ * @return array keyed by content type machine name
+ */
+function ent_nodeblock_get_conf_content_types($enabled_only = TRUE) {
+  $config = variable_get('ent_nodeblock', array());
+  $content_types = isset($config['content_types']) ? $config['content_types'] : array();
+  if ($enabled_only) {
+    foreach ($content_types as $type => $datas) {
+      if (!$datas['enabled']) unset($content_types[$type]);
+    }
+  }
+  return $content_types;
 }
 
 /**
  * Get nids of nodes to concert to blocks
- * @param array $types : filter by content types
+ * @param array $content_types : filter by content types
  * @return array
  */
-function ent_nodeblock_get_nodes($types = array()) {
-  if (!$types) return array();
+function ent_nodeblock_get_nodes($content_types = array()) {
+  if (!$content_types) return array();
   $query = db_select('node', 'n');
-  $query->condition('type', $types, 'IN');
+  $query->condition('type', $content_types, 'IN');
   $query->addField('n', 'nid');
   $query->addTag('node_access');
   $nids = $query->execute()->fetchCol();
@@ -124,6 +141,19 @@ function ent_nodeblock_delete_block($delta) {
 function theme_ent_nodeblock($variables) {
   $node = node_view($variables['node'], $variables['view_mode']);
   return drupal_render($node);
+}
+
+/**
+ * Implements hook_preprocess_node
+ * @param $variables
+ */
+function ent_nodeblock_preprocess_node(&$variables) {
+  $node = $variables['node'];
+  $conf = ent_nodeblock_get_conf_content_types();
+  // workaround to hide node title if asked
+  if (!empty($conf[$node->type]['hide_node_title'])) {
+    $variables['page'] = TRUE;
+  }
 }
 
 
