@@ -1,0 +1,137 @@
+<?php
+
+/**
+ * Implements hook_menu
+ */
+function ent_nodeblock_menu() {
+  return array(
+    'admin/structure/ent-nodeblock' => array(
+      'title' => 'Ent nodeblock',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('ent_nodeblock_config_form'),
+      'file' => 'ent_nodeblock.admin.inc',
+      'access arguments' => array('administer site configuration'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_theme().
+ * Declare templates to Drupal.
+ */
+function ent_nodeblock_theme() {
+  return array(
+    'ent_nodeblock' => array(
+      'variables' => array('node' => NULL, 'view_mode' => 'full'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_info()
+ * Declares block to Drupal
+ */
+function ent_nodeblock_block_info() {
+  $blocks = array();
+  foreach (ent_nodeblock_get_all() as $nid) {
+    $node = node_load($nid);
+    $delta = ent_nodeblock_get_delta($nid);
+    $blocks[$delta] = array('info' => t($node->title));
+    drupal_alter('ent_nodeblock_info', $blocks[$delta], $node);
+  }
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view();
+ * Define what a block defined in hook_block_info has to display
+ */
+function ent_nodeblock_block_view($delta) {
+  if (strpos($delta, 'ent_nodeblock') !== 0) return;
+  $node = node_load(ent_nodeblock_extract_nid_from_delta($delta));
+  $block = array(
+    'subject' => $node->title,
+    'content' => array(
+      '#theme' => 'ent_nodeblock',
+      '#node' => $node,
+      '#view_mode' => 'full',
+    ),
+  );
+  drupal_alter('ent_nodeblock_view', $block, $node);
+  return $block;
+}
+
+/**
+ * Implements hook_node_delete()
+ * When deleting a node, also delete associated block
+ */
+function ent_nodeblock_node_delete($node) {
+  ent_nodeblock_delete_block(ent_nodeblock_get_delta($node->nid));
+}
+
+/**
+ * Get nid from delta string (e.g : for ent_nodeblock-17, this function return 17)
+ * @param string $delta
+ * @return int
+ */
+function ent_nodeblock_extract_nid_from_delta($delta) {
+  $parts = explode('-', $delta);
+  return array_pop($parts);
+}
+
+/**
+ * Create a machine name for the block
+ * @param $nid : nid of the node
+ * @return string : delta usable for a block
+ */
+function ent_nodeblock_get_delta($nid) {
+  return "ent_nodeblock-$nid";
+}
+
+/**
+ * Get all nodes nids we have to convert tob blokcs
+ * @return array of nids
+ */
+function ent_nodeblock_get_all() {
+  return ent_nodeblock_get_nodes(variable_get('ent_nodeblock_content_types', array()));
+}
+
+/**
+ * Get nids of nodes to concert to blocks
+ * @param array $types : filter by content types
+ * @return array
+ */
+function ent_nodeblock_get_nodes($types = array()) {
+  if (!$types) return array();
+  $query = db_select('node', 'n');
+  $query->condition('type', $types, 'IN');
+  $query->addField('n', 'nid');
+  $query->addTag('node_access');
+  $nids = $query->execute()->fetchCol();
+  return $nids;
+}
+
+/**
+ * Delete a block according to its delta
+ * @param string $delta
+ */
+function ent_nodeblock_delete_block($delta) {
+  foreach (array('block', 'block_role', 'block_node_type') as $table) {
+    db_delete($table)->condition('delta', $delta)->execute();
+  }
+}
+
+function theme_ent_nodeblock($variables) {
+  $node = $variables['node'];
+  $view_mode = $variables['view_mode'];
+  $node = node_view($node, $view_mode);
+  return drupal_render($node);
+}
+
+
+
+
+
+
+
+

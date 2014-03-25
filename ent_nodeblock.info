@@ -1,0 +1,5 @@
+name = Ent Nodeblock
+description = Convert nodes to block
+configure = admin/structure/ent-nodeblock
+core = 7.x
+
