@@ -93,24 +93,7 @@ function ent_nodeblock_create_delta($nid) {
  * @return array of nids
  */
 function ent_nodeblock_get_all() {
-  $content_types = ent_nodeblock_get_conf_content_types(TRUE);
-  return ent_nodeblock_get_nodes(array_keys($content_types));
-}
-
-/**
- * Get content types configuration, set in admin/structure/ent-nodeblock
- * @param bool $enabled_only return only enabled content_types conf
- * @return array keyed by content type machine name
- */
-function ent_nodeblock_get_conf_content_types($enabled_only = TRUE) {
-  $config = variable_get('ent_nodeblock', array());
-  $content_types = isset($config['content_types']) ? $config['content_types'] : array();
-  if ($enabled_only) {
-    foreach ($content_types as $type => $datas) {
-      if (!$datas['enabled']) unset($content_types[$type]);
-    }
-  }
-  return $content_types;
+  return ent_nodeblock_get_nodes(array_keys(ent_nodeblock_get_conf(TRUE)));
 }
 
 /**
@@ -148,12 +131,30 @@ function theme_ent_nodeblock($variables) {
  * @param $variables
  */
 function ent_nodeblock_preprocess_node(&$variables) {
-  $node = $variables['node'];
-  $conf = ent_nodeblock_get_conf_content_types();
+  $conf = ent_nodeblock_get_conf();
   // workaround to hide node title if asked
-  if (!empty($conf[$node->type]['hide_node_title'])) {
+  if ($conf[$variables['node']->type]['hide_node_title']) {
     $variables['page'] = TRUE;
   }
+}
+
+function ent_nodeblock_get_conf($enabled_only = FALSE) {
+  // set default value, used when the user has not yet visited the admin page
+  $conf = array();
+  foreach (node_type_get_names() as $type => $name) {
+    $conf[$type] = array(
+      'enabled' => FALSE,
+      'hide_node_title' => TRUE,
+    );
+  }
+  $conf = variable_get('ent_nodeblock', $conf);
+
+  // return only enabled content types if asked
+  if ($enabled_only)  {
+    $conf = array_filter($conf, function($a){return !empty($a['enabled']);});
+  }
+
+  return $conf;
 }
 
 
